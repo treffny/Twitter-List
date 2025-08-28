@@ -1,0 +1,16 @@
+{
+  "fetch_all_handles": {
+    "method": "GET",
+    "url": "https://YOUR_VERCEL_URL/api/tweets?days=2",
+    "headers": {
+      "Accept": "application/json"
+    }
+  },
+  "fetch_single_handle": {
+    "method": "GET",
+    "url": "https://YOUR_VERCEL_URL/api/tweets/nicholadrummond?days=2",
+    "headers": {
+      "Accept": "application/json"
+    }
+  }
+}
