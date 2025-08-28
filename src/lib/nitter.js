@@ -1,4 +1,4 @@
-import { parseStringPromise } from 'xml2js';
+import { XMLParser } from 'fast-xml-parser';
 
 const DEFAULT_HOSTS = process.env.NITTER_HOSTS
   ? process.env.NITTER_HOSTS.split(',').map(s => s.trim())
@@ -15,7 +15,7 @@ const DEFAULT_HOSTS = process.env.NITTER_HOSTS
 const UA = process.env.FETCH_UA || 'Mozilla/5.0 (compatible; SixthFieldTweetProxy/1.0; +https://vercel.com)';
 
 async function fetchRss(host, handle) {
-  const url = `${host.replace(/\\/$/,'')}/${handle}/rss`;
+  const url = `${host.replace(/\/$/,'')}/${handle}/rss`;
   const res = await fetch(url, {
     headers: {
       'User-Agent': UA,
@@ -27,6 +27,15 @@ async function fetchRss(host, handle) {
   const xml = await res.text();
   if (!xml || xml.length < 50) throw new Error('Empty XML');
   return xml;
+}
+
+function parseRss(xml) {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    allowBooleanAttributes: true,
+    attributeNamePrefix: "@_",
+  });
+  return parser.parse(xml);
 }
 
 export async function fetchFromNitter(handle, days=2, debug=false) {
@@ -49,25 +58,33 @@ export async function fetchFromNitter(handle, days=2, debug=false) {
   }
   if (!xml) return debug ? { debug: { attempts }, items: [] } : [];
 
-  const doc = await parseStringPromise(xml);
-  const items = doc?.rss?.channel?.[0]?.item || [];
-  const rows = [];
+  let doc;
+  try {
+    doc = parseRss(xml);
+  } catch (e) {
+    const cleaned = xml.replace(/\s([a-zA-Z:-]+)(?=\s|>)/g, ' $1="$1"');
+    doc = parseRss(cleaned);
+  }
 
+  const channel = doc?.rss?.channel;
+  const items = Array.isArray(channel?.item) ? channel.item : (channel?.item ? [channel.item] : []);
+
+  const rows = [];
   for (const it of items) {
-    const pub = it.pubDate?.[0] || '';
+    const pub = it.pubDate || '';
     const dt = new Date(pub);
     if (!dt.getTime() || dt.getTime() < since) continue;
 
-    const link = it.link?.[0] || '';
-    const title = (it.title?.[0] || '').trim();
-    const description = (it.description?.[0] || '').trim();
-    const encoded = it['content:encoded']?.[0] || '';
+    const link = it.link || '';
+    const title = (it.title || '').trim();
+    const description = (it.description || '').trim();
+    const encoded = it['content:encoded'] || '';
 
     const low = (title + ' ' + description).toLowerCase();
-    if (low.startsWith('rt ') || low.includes(' rt @') || low.includes('rt by')) continue; // exclude retweets
+    if (low.startsWith('rt ') || low.includes(' rt @') || low.includes('rt by')) continue;
 
     let id = '';
-    const m = link.match(/\\/status\\/(\\d+)/);
+    const m = link.match(/\/status\/(\d+)/);
     if (m) id = m[1];
 
     const tweetUrl = id ? `https://x.com/${handle}/status/${id}` : link;
@@ -78,7 +95,7 @@ export async function fetchFromNitter(handle, days=2, debug=false) {
       author_handle: handle,
       tweet_id: id,
       tweet_url: tweetUrl,
-      tweet_text: title.replace(/\\s+/g,' ').trim(),
+      tweet_text: title.replace(/\s+/g,' ').trim(),
       media_present: !!media
     });
   }
