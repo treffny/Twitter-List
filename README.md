@@ -1,12 +1,12 @@
-# Sixth Field Tweet Proxy (XML tolerant)
+# Sixth Field Tweet Proxy v2
 
-Uses fast-xml-parser with boolean attributes enabled to handle broken RSS feeds.
-Includes /api/health diagnostics.
+XML-tolerant + Apify by default.
 
-## Deploy
-Push to GitHub, import in Vercel, set env vars from .env.example, deploy.
+## Features
+- Nitter with fast-xml-parser (fallback)
+- Apify support (default if USE_APIFY=true)
+- Debug mode: add &debug=1
+- Force Apify: add &source=apify
 
-## Endpoints
-- /api/tweets?days=2
-- /api/tweets/<handle>?days=2
-- /api/health?handle=<handle>&days=2
+## Env
+See .env.example
